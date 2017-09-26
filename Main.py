@@ -126,11 +126,12 @@ def runNN(session, xIn, yIn, trainer=None, epochs=1, batchSize=100, printEvery =
         #print('Validation')
         #runNN(sess, validationInputData, validationOutputLabels, trainer=None, batchSize=10, lossPlot=True)
         
-for lrTest in range(2, 10, 1):
+for lrTest in range(1, 5, .5):
     lrUse = 10^(-lrTest)
+    print('learning rate: {}'.format(lrUse))
     optimizer = tf.train.AdamOptimizer(lrUse)
     with tf.Session() as sess:
         with tf.device("/gpu:0"):
             sess.run(tf.global_variables_initializer())
-            runNN(sess, inputData[:2000,:], outputLabels[:2000,], trainer=trainer, batchSize=100, epochs=30, printEvery=5, lossPlot=True, plotname='lr{}'.format(lrTest))
+            runNN(sess, inputData[:2000,:], outputLabels[:2000,], trainer=trainer, batchSize=100, epochs=40, printEvery=5, lossPlot=True, plotname='lr{}'.format(lrTest))
                 
