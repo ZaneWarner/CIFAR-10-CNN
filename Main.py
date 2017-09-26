@@ -126,8 +126,8 @@ def runNN(session, xIn, yIn, trainer=None, epochs=1, batchSize=100, printEvery =
         #print('Validation')
         #runNN(sess, validationInputData, validationOutputLabels, trainer=None, batchSize=10, lossPlot=True)
         
-for lrTest in range(1, 5, .5):
-    lrUse = 10^(-lrTest)
+for lrTest in range(1, 9):
+    lrUse = 10**(-lrTest))
     print('learning rate: {}'.format(lrUse))
     optimizer = tf.train.AdamOptimizer(lrUse)
     with tf.Session() as sess:
