@@ -10,6 +10,9 @@
 # Investigate & consider adding batch norm, dropout, learning rate decay
 # Also investigate going deeper - will likely involve some method of downsampling
 
+##Testing Notes
+# First sweep of learning rates found optimal rate to be 1e(-5 +/- 1)
+
 import numpy as np
 import tensorflow as tf
 import math
@@ -112,6 +115,7 @@ def runNN(session, xIn, yIn, trainer=None, epochs=1, batchSize=100, printEvery =
     netSaver.save(session, './NetworkSaves/CNN')   
     if lossPlot == True:
         plt.plot(lossValues)
+        plt.axis([0,45,0,400])
         plt.savefig(plotname)
         plt.clf()
     
@@ -126,12 +130,12 @@ def runNN(session, xIn, yIn, trainer=None, epochs=1, batchSize=100, printEvery =
         #print('Validation')
         #runNN(sess, validationInputData, validationOutputLabels, trainer=None, batchSize=10, lossPlot=True)
         
-for lrTest in range(1, 9):
+for lrTest in range(1, 10):
     lrUse = 10**(-lrTest)
     print('learning rate: {}'.format(lrUse))
     optimizer = tf.train.AdamOptimizer(lrUse)
     with tf.Session() as sess:
         with tf.device("/gpu:0"):
             sess.run(tf.global_variables_initializer())
-            runNN(sess, inputData[:2000,:], outputLabels[:2000,], trainer=trainer, batchSize=100, epochs=40, printEvery=5, lossPlot=True, plotname='lr{}'.format(lrTest))
+            runNN(sess, inputData, outputLabels, trainer=trainer, batchSize=100, epochs=40, printEvery=5, lossPlot=True, plotname='lr{}'.format(lrTest))
                 
