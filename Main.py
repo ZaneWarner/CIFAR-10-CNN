@@ -77,6 +77,7 @@ def makeTwoConvLayersGraph(x):
 
 outputLayer = makeTwoConvLayersGraph(x)
 loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer)
+numCorrect = tf.reduce_sum(tf.cast(tf.equal(tf.argmax(outputLayer, axis=1), y), tf.float32))
 
 optimizer = tf.train.AdamOptimizer(1e-5)
 trainer = optimizer.minimize(loss)
@@ -86,6 +87,7 @@ netSaver = tf.train.Saver()
 ##### Running the Network #####
 def runNN(session, xIn, yIn, trainer=None, epochs=1, batchSize=100, printEvery = 20, lossPlot=False, plotname='lossplot.png'):
     lossValues = []
+    accuracies = []
     numExamples = len(xIn)
     numBatches = math.ceil(numExamples/batchSize)
     batchRemainder = numExamples % batchSize
@@ -93,6 +95,7 @@ def runNN(session, xIn, yIn, trainer=None, epochs=1, batchSize=100, printEvery =
     for epoch in range(epochs):
         np.random.shuffle(batchIndices)
         batchLossAggregator = 0
+        correctAggregator = 0
         for batch in range(numBatches):
             batchLower = batch*batchSize
             if batch != numBatches:
@@ -103,23 +106,24 @@ def runNN(session, xIn, yIn, trainer=None, epochs=1, batchSize=100, printEvery =
             values = {x : xIn[np.array(thisBatch)],
                       y : yIn[np.array(thisBatch)]}
             if trainer is not None:
-                batchLossValue, _ = session.run([loss, trainer], feed_dict = values)
+                batchLossValue, correct, _ = session.run([loss, numCorrect, trainer], feed_dict = values)
             else:
-                batchLossValue = session.run(loss, feed_dict = values)
+                batchLossValue, correct = session.run([loss, numCorrect], feed_dict = values)
             batchLossAggregator += batchLossValue
+            correctAggregator += correct
         lossValues.append(batchLossAggregator)
-
+        accuracies.append(correctAggregator/numExamples)
         if epoch % printEvery == 0 and trainer is not None:
-            print('Epoch {}--Loss Value: {}'.format(epoch+1, lossValues[epoch]))
+            print('Training Epoch {}--Loss Value: {}, Accuracy: {}'.format(epoch+1, lossValues[epoch], accuracies[epoch]))
+        elif trainer is None: print('Test Outcomes--Loss Value: {}, Accuracy: {}'.format(lossValues[epoch], accuracies[epoch]))
     
     netSaver.save(session, './NetworkSaves/CNN')   
     if lossPlot == True:
         plt.plot(lossValues)
-        plt.axis([0,45,0,400])
         plt.savefig(plotname)
         plt.clf()
     
-    return lossValues
+    return lossValues, accuracies
 
 #### Execution #####
 # with tf.Session() as sess:
@@ -129,13 +133,21 @@ def runNN(session, xIn, yIn, trainer=None, epochs=1, batchSize=100, printEvery =
 #         runNN(sess, inputData[:100,:], outputLabels[:100,], trainer=trainer, batchSize=50, epochs=2, printEvery=2, lossPlot=True)
         #print('Validation')
         #runNN(sess, validationInputData, validationOutputLabels, trainer=None, batchSize=10, lossPlot=True)
-        
-for lrTest in range(1, 10):
-    lrUse = 10**(-lrTest)
-    print('learning rate: {}'.format(lrUse))
-    optimizer = tf.train.AdamOptimizer(lrUse)
+
+testBatchSizes = [10, 25, 50, 100, 200, 400, 800, 2000]
+for batchTest in testBatchSizes:
+    testAccuracies = []
+    #lrUse = 10**(-lrTest)
+    #print('learning rate: {}'.format(lrUse))
+    #optimizer = tf.train.AdamOptimizer(lrUse)
     with tf.Session() as sess:
         with tf.device("/gpu:0"):
             sess.run(tf.global_variables_initializer())
-            runNN(sess, inputData, outputLabels, trainer=trainer, batchSize=100, epochs=40, printEvery=5, lossPlot=True, plotname='lr{}'.format(lrTest))
-                
+            runNN(sess, inputData, outputLabels, trainer=trainer, batchSize=batchTest, epochs=40, printEvery=5, lossPlot=False)
+            print('Validation for Batch Size {}'.format(batchTest))
+            testLossVals, testAccuracyVals = runNN(sess, validationInputData, validationOutputLabels, batchSize=batchTest, trainer=None, lossPlot=False, printEvery=5)
+            testAccuracies.append(testAccuracyVals[0])
+
+plt.plot(testBatchSizes, testAccuracies)
+plt.savefig('batchSizeTestResults')
+plt.clf()
