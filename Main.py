@@ -72,12 +72,12 @@ def makeTwoConvLayersGraph(x):
     c1 = tf.nn.conv2d(x, filter1, strides=[1,1,1,1], padding="SAME", name="c1") + bias1
     a1 = tf.nn.relu(c1, name="a1")
     drpo1 = tf.layers.dropout(a1, rate=.5, name="drpo1")
-    mp1 = tf.nn.max_pool(drpo1, ksize=[1,2,2,1], strides=[1,2,2,1], name='mp1')
+    mp1 = tf.nn.max_pool(drpo1, ksize=[1,2,2,1], strides=[1,2,2,1], padding="SAME", name='mp1')
     bn1 = tf.layers.batch_normalization(mp1, axis=3, training=trainingMode, name="bn1")
     c2 = tf.nn.conv2d(bn1, filter2, strides=[1,1,1,1], padding="SAME", name="c2") + bias2
     a2 = tf.nn.relu(c2, name="a2")
     drpo2 = tf.layers.dropout(a2, rate=.5, name="drpo2")
-    mp2 = tf.nn.max_pool(drpo2, ksize=[1,2,2,1], strides=[1,2,2,1], name='mp2')
+    mp2 = tf.nn.max_pool(drpo2, ksize=[1,2,2,1], strides=[1,2,2,1], padding="SAME", name='mp2')
     bn2 = tf.layers.batch_normalization(mp2, axis=3, training=trainingMode, name="bn2")
     bn2Flat = tf.reshape(bn2, [-1, 8*8*16])
     fc3 = tf.layers.dense(bn2Flat, units=10, name="fc3") #note that this name will be made weird by the autoaddition of a bias node
