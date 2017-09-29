@@ -81,7 +81,7 @@ def makeTwoConvLayersGraph(x):
     mp2 = tf.nn.max_pool(drpo2, ksize=[1,2,2,1], strides=[1,2,2,1], padding="SAME", name='mp2')
     bn2 = tf.layers.batch_normalization(mp2, axis=3, training=trainingMode, name="bn2")
     bn2Flat = tf.reshape(bn2, [-1, 8*8*16])
-    fc3 = tf.layers.dense(bn2Flat, units=10, name="fc3") #note that this name will be made weird by the autoaddition of a bias node
+    fc3 = tf.layers.dense(bn2Flat, units=1000, name="fc3") #note that this name will be made weird by the autoaddition of a bias node
     a3 = tf.nn.relu(fc3, name="a4")
     drpo3 = tf.layers.dropout(a3, rate=.5, name="drpo3")
     fc4 = tf.layers.dense(drpo3, units=10, name="fc4")
