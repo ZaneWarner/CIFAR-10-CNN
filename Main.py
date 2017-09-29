@@ -6,13 +6,14 @@
 ##########
 
 ##TODO
+# Add max pooling with dropout to see if it fixes the overfitting problem
 # Tune hyperparams (batch size and learning rate)
-# Investigate & consider adding batch norm, dropout, learning rate decay
-# Also investigate going deeper - will likely involve some method of downsampling
 
 ##Testing Notes
 # First sweep of learning rates found optimal rate to be 1e(-5 +/- 1)
-# First batch size sweep found extensive overfitting even at small batch sizes. Dropout will be added before continuing.
+# First batch size sweep found extensive overfitting even at small batch sizes.
+# Adding Batch Normalizaiton was insufficient regularization to prevent overfitting
+
 
 import numpy as np
 import tensorflow as tf
@@ -64,17 +65,21 @@ def makeTwoConvLayersGraph(x):
     #Initialize variables
     filter1 = tf.get_variable("filter1", [32,32,3,32])
     bias1 = tf.get_variable("bias1", [32])
-    filter2 = tf.get_variable("filter2", [32,32,32,16])
+    filter2 = tf.get_variable("filter2", [16,16,32,16])
     bias2 = tf.get_variable("bias2", [16])
     
     #Build Graph
     c1 = tf.nn.conv2d(x, filter1, strides=[1,1,1,1], padding="SAME", name="c1") + bias1
     a1 = tf.nn.relu(c1, name="a1")
-    bn1 = tf.layers.batch_normalization(a1, axis=3, training=trainingMode, name="bn1")
+    drpo1 = tf.layers.dropout(a1, rate=.5, name="drpo1")
+    mp1 = tf.nn.max_pool(drpo1, ksize=[1,2,2,1], strides=[1,2,2,1], name='mp1')
+    bn1 = tf.layers.batch_normalization(mp1, axis=3, training=trainingMode, name="bn1")
     c2 = tf.nn.conv2d(bn1, filter2, strides=[1,1,1,1], padding="SAME", name="c2") + bias2
     a2 = tf.nn.relu(c2, name="a2")
-    bn2 = tf.layers.batch_normalization(a2, axis=3, training=trainingMode, name="bn2")
-    bn2Flat = tf.reshape(bn2, [-1, 32*32*16])
+    drpo2 = tf.layers.dropout(a2, rate=.5, name="drpo2")
+    mp2 = tf.nn.max_pool(drpo2, ksize=[1,2,2,1], strides=[1,2,2,1], name='mp2')
+    bn2 = tf.layers.batch_normalization(mp2, axis=3, training=trainingMode, name="bn2")
+    bn2Flat = tf.reshape(bn2, [-1, 8*8*16])
     fc3 = tf.layers.dense(bn2Flat, units=10, name="fc3") #note that this name will be made weird by the autoaddition of a bias node
     return fc3
 
