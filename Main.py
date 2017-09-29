@@ -13,6 +13,7 @@
 # First sweep of learning rates found optimal rate to be 1e(-5 +/- 1)
 # First batch size sweep found extensive overfitting even at small batch sizes.
 # Adding Batch Normalizaiton was insufficient regularization to prevent overfitting
+# Adding max-pool dropout helped reduce the degree of overfitting, but insufficiently
 
 
 import numpy as np
@@ -81,7 +82,10 @@ def makeTwoConvLayersGraph(x):
     bn2 = tf.layers.batch_normalization(mp2, axis=3, training=trainingMode, name="bn2")
     bn2Flat = tf.reshape(bn2, [-1, 8*8*16])
     fc3 = tf.layers.dense(bn2Flat, units=10, name="fc3") #note that this name will be made weird by the autoaddition of a bias node
-    return fc3
+    a3 = tf.nn.relu(fc3, name="a4")
+    drpo3 = tf.layers.dropout(a3, rate=.5, name="drpo3")
+    fc4 = tf.layers.dense(drpo3, units=10, name="fc4")
+    return fc4
 
 outputLayer = makeTwoConvLayersGraph(x)
 loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer)
