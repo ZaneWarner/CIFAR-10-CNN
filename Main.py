@@ -150,7 +150,7 @@ def runNN(session, xIn, yIn, trainer=None, epochs=1, batchSize=100, printEvery =
         #print('Validation')
         #runNN(sess, validationInputData, validationOutputLabels, trainer=None, batchSize=10, lossPlot=True)
 
-testBatchSizes = [25, 50] #[10, 25, 50, 100, 200, 400, 800, 2000]
+testBatchSizes = [50] #[10, 25, 50, 100, 200, 400, 800, 2000]
 testLearningRates = [1e-5] #[1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10]
 testAccuracies = np.zeros([8,10])
 for i in range(len(testBatchSizes)):
@@ -164,6 +164,7 @@ for i in range(len(testBatchSizes)):
                 runNN(sess, inputData, outputLabels, trainer=trainer, batchSize=testBatchSizes[i], epochs=40, printEvery=5, lossPlot=False)
                 print('Validation for Batch Size {}, Learning Rate {}'.format(testBatchSizes[i], testLearningRates[j]))
                 testLossVals, testAccuracyVals = runNN(sess, validationInputData, validationOutputLabels, batchSize=testBatchSizes[i], trainer=None, lossPlot=False, printEvery=5)
+                testLossVals, testAccuracyVals = runNN(sess, validationInputData, validationOutputLabels, batchSize=1000, trainer=None, lossPlot=False, printEvery=5)
                 testAccuracies[i, j] = testAccuracyVals[0]
 
 print("Test Accuracy Matrix (Rows by Batch Size, Cols by Learning Rate):")
