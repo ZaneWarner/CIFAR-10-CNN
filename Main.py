@@ -64,9 +64,9 @@ def makeTwoConvLayersGraph(x):
     #This creates the graph for a network that goes conv-relu-conv-relu-affine
     #The output is not activated after the dense later since it is designed to be fed to a loss function (e.g. a softmax)
     #Initialize variables
-    filter1 = tf.get_variable("filter1", [32,32,3,32])
+    filter1 = tf.get_variable("filter1", [32,32,3,16])
     bias1 = tf.get_variable("bias1", [32])
-    filter2 = tf.get_variable("filter2", [16,16,32,16])
+    filter2 = tf.get_variable("filter2", [16,16,16,16])
     bias2 = tf.get_variable("bias2", [16])
     
     #Build Graph
@@ -81,11 +81,8 @@ def makeTwoConvLayersGraph(x):
     mp2 = tf.nn.max_pool(drpo2, ksize=[1,2,2,1], strides=[1,2,2,1], padding="SAME", name='mp2')
     bn2 = tf.layers.batch_normalization(mp2, axis=3, training=trainingMode, name="bn2")
     bn2Flat = tf.reshape(bn2, [-1, 8*8*16])
-    fc3 = tf.layers.dense(bn2Flat, units=1000, name="fc3") #note that this name will be made weird by the autoaddition of a bias node
-    a3 = tf.nn.relu(fc3, name="a4")
-    drpo3 = tf.layers.dropout(a3, rate=.5, name="drpo3")
-    fc4 = tf.layers.dense(drpo3, units=10, name="fc4")
-    return fc4
+    fc3 = tf.layers.dense(bn2Flat, units=10, name="fc3") #note that this name will be made weird by the autoaddition of a bias node
+    return fc3
 
 outputLayer = makeTwoConvLayersGraph(x)
 loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer)
@@ -150,8 +147,8 @@ def runNN(session, xIn, yIn, trainer=None, epochs=1, batchSize=100, printEvery =
         #print('Validation')
         #runNN(sess, validationInputData, validationOutputLabels, trainer=None, batchSize=10, lossPlot=True)
 
-testBatchSizes = [10, 25, 50, 100, 200, 400, 800, 2000]
-testLearningRates = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10]
+testBatchSizes = [25, 50] #[10, 25, 50, 100, 200, 400, 800, 2000]
+testLearningRates = [1e-5] #[1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10]
 testAccuracies = np.zeros([8,10])
 for i in range(len(testBatchSizes)):
     for j in range(len(testLearningRates)):
