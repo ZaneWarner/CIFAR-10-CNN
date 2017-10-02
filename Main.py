@@ -19,6 +19,7 @@
 import numpy as np
 import tensorflow as tf
 import math
+from DataAugmenter import HorizontalFlip
 import matplotlib.pyplot as plt
 
 ##### CIFAR-10 #####
@@ -54,6 +55,14 @@ channel3Mean = np.mean(inputData[:,:,:,2])
 inputData[:,:,:,0] -= channel1Mean
 inputData[:,:,:,1] -= channel2Mean
 inputData[:,:,:,2] -= channel3Mean
+
+augmentedData = np.zeros(inputData.shape)
+for i in range(len(inputData[:,0,0,0])):
+    img = inputData[i,:,:,:]
+    newImg = HorizontalFlip(img)
+    augmentedData[i,:,:,:] = newImg
+inputData = np.append(inputData, augmentedData, 0)
+print(inputData.shape)
 
 validationDataDict = unpickle('cifar-10-batches-py/data_batch_5')
 validationInputData = validationDataDict[b'data']
@@ -174,7 +183,7 @@ for i in range(len(testBatchSizes)):
                 print('Validation for Batch Size {}, Learning Rate {}'.format(testBatchSizes[i], testLearningRates[j]))
                 testLossVals, testAccuracyVals = runNN(sess, validationInputData, validationOutputLabels, batchSize=1000, trainer=None, lossPlot=False, printEvery=5)
                 testAccuracies[i, j] = testAccuracyVals[0]
- 
+  
 print("Test Accuracy Matrix (Rows by Batch Size, Cols by Learning Rate):")
 print(testAccuracies)
 topAccuracyIndex = np.argmax(testAccuracies)
