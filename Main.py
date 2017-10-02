@@ -88,8 +88,11 @@ outputLayer = makeTwoConvLayersGraph(x)
 loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer)
 numCorrect = tf.reduce_sum(tf.cast(tf.equal(tf.argmax(outputLayer, axis=1), y), tf.float32))
 
+update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+
 optimizer = tf.train.AdamOptimizer(1e-5)
-trainer = optimizer.minimize(loss)
+with tf.control_dependencies(update_ops):
+    trainer = optimizer.minimize(loss)
 
 netSaver = tf.train.Saver()
 
@@ -153,6 +156,8 @@ testAccuracies = np.zeros([8,10])
 for i in range(len(testBatchSizes)):
     for j in range(len(testLearningRates)):
         optimizer = tf.train.AdamOptimizer(testLearningRates[j])
+        with tf.control_dependencies(update_ops):
+            trainer = optimizer.minimize(loss)
         with tf.Session() as sess:
             with tf.device("/gpu:0"):
                 sess.run(tf.global_variables_initializer())
