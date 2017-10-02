@@ -62,7 +62,8 @@ for i in range(len(inputData[:,0,0,0])):
     newImg = HorizontalFlip(img)
     augmentedData[i,:,:,:] = newImg
 inputData = np.append(inputData, augmentedData, 0)
-print(inputData.shape)
+outputLabels = np.append(outputLabels, outputLabels, 0)
+print(outputLabels.shape)
 
 validationDataDict = unpickle('cifar-10-batches-py/data_batch_5')
 validationInputData = validationDataDict[b'data']
