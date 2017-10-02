@@ -47,13 +47,22 @@ for i in [1,2,3]:
     np.append(inputData, imageDataDicts[i][b'data'], axis=0)
     np.append(outputLabels, np.array(imageDataDicts[i][b'labels']), axis=0)
     
-inputData = inputData.reshape(-1, 32, 32, 3)
+inputData = np.float64(inputData.reshape(-1, 32, 32, 3))
+channel1Mean = np.mean(inputData[:,:,:,0])
+channel2Mean = np.mean(inputData[:,:,:,1])
+channel3Mean = np.mean(inputData[:,:,:,2])
+inputData[:,:,:,0] -= channel1Mean
+inputData[:,:,:,1] -= channel2Mean
+inputData[:,:,:,2] -= channel3Mean
 
 validationDataDict = unpickle('cifar-10-batches-py/data_batch_5')
 validationInputData = validationDataDict[b'data']
 validationOutputLabels = np.array(validationDataDict[b'labels'])
 
-validationInputData = validationInputData.reshape(-1, 32, 32, 3)
+validationInputData = np.float64(validationInputData.reshape(-1, 32, 32, 3))
+validationInputData[:,:,:,0] -= channel1Mean
+validationInputData[:,:,:,1] -= channel2Mean
+validationInputData[:,:,:,2] -= channel3Mean
 
 ##### Graph Creation #####
 x = tf.placeholder(tf.float32, [None, 32, 32, 3])
@@ -163,10 +172,9 @@ for i in range(len(testBatchSizes)):
                 sess.run(tf.global_variables_initializer())
                 runNN(sess, inputData, outputLabels, trainer=trainer, batchSize=testBatchSizes[i], epochs=40, printEvery=5, lossPlot=False)
                 print('Validation for Batch Size {}, Learning Rate {}'.format(testBatchSizes[i], testLearningRates[j]))
-                testLossVals, testAccuracyVals = runNN(sess, validationInputData, validationOutputLabels, batchSize=testBatchSizes[i], trainer=None, lossPlot=False, printEvery=5)
                 testLossVals, testAccuracyVals = runNN(sess, validationInputData, validationOutputLabels, batchSize=1000, trainer=None, lossPlot=False, printEvery=5)
                 testAccuracies[i, j] = testAccuracyVals[0]
-
+ 
 print("Test Accuracy Matrix (Rows by Batch Size, Cols by Learning Rate):")
 print(testAccuracies)
 topAccuracyIndex = np.argmax(testAccuracies)
