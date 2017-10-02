@@ -18,3 +18,11 @@ def HorizontalFlip(img):
     for i in range(32):
         flippedImg[:,i,:] = img[:,31-i,:]
     return flippedImg
+
+def RandomHueShift(img, hueFloor=.95, hueCeil=1.05):
+    shiftedImg = np.zeros([32, 32, 3])
+    shiftAmts = np.random.uniform(hueFloor, hueCeil, 3)
+    for i in range(3):
+        shiftedImg[:,:,i] = img[:,:,i]*shiftAmts[i]
+    return shiftedImg
+        

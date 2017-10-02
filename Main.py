@@ -19,7 +19,7 @@
 import numpy as np
 import tensorflow as tf
 import math
-from DataAugmenter import HorizontalFlip
+from DataAugmenter import HorizontalFlip, RandomHueShift
 import matplotlib.pyplot as plt
 
 ##### CIFAR-10 #####
@@ -59,11 +59,10 @@ inputData[:,:,:,2] -= channel3Mean
 augmentedData = np.zeros(inputData.shape)
 for i in range(len(inputData[:,0,0,0])):
     img = inputData[i,:,:,:]
-    newImg = HorizontalFlip(img)
+    newImg = RandomHueShift(HorizontalFlip(img))
     augmentedData[i,:,:,:] = newImg
 inputData = np.append(inputData, augmentedData, 0)
 outputLabels = np.append(outputLabels, outputLabels, 0)
-print(outputLabels.shape)
 
 validationDataDict = unpickle('cifar-10-batches-py/data_batch_5')
 validationInputData = validationDataDict[b'data']
