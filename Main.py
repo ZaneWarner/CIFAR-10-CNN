@@ -65,7 +65,7 @@ def makeTwoConvLayersGraph(x):
     #The output is not activated after the dense later since it is designed to be fed to a loss function (e.g. a softmax)
     #Initialize variables
     filter1 = tf.get_variable("filter1", [32,32,3,16])
-    bias1 = tf.get_variable("bias1", [32])
+    bias1 = tf.get_variable("bias1", [16])
     filter2 = tf.get_variable("filter2", [16,16,16,16])
     bias2 = tf.get_variable("bias2", [16])
     
