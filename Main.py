@@ -85,9 +85,7 @@ def makeTwoConvLayersGraph(x):
     return fc3
 
 outputLayer = makeTwoConvLayersGraph(x)
-lossVector = tf.nn.softmax_cross_entropy_with_logits(labels=tf.one_hot(y, 10), logits=outputLayer)
-loss = tf.reduce_mean(lossVector)
-
+loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer)
 numCorrect = tf.reduce_sum(tf.cast(tf.equal(tf.argmax(outputLayer, axis=1), y), tf.float32))
 
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
