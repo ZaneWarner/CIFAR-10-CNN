@@ -125,9 +125,9 @@ def runNN(session, xIn, yIn, trainer=None, epochs=1, batchSize=100, printEvery =
                           y : yIn[np.array(thisBatch)],
                           trainingMode : False}
                 batchLossValue, correct = session.run([loss, numCorrect], feed_dict = values)
-            batchLossAggregator += batchLossValue
+            batchLossAggregator += batchLossValue*len(thisBatch)
             correctAggregator += correct
-        lossValues.append(batchLossAggregator)
+        lossValues.append(batchLossAggregator/numExamples)
         accuracies.append(correctAggregator/numExamples)
         if epoch % printEvery == 0 and trainer is not None:
             print('Training Epoch {}--Loss Value: {}, Accuracy: {}'.format(epoch+1, lossValues[epoch], accuracies[epoch]))
