@@ -26,3 +26,4 @@ def RandomHueShift(img, hueFloor=.95, hueCeil=1.05):
         shiftedImg[:,:,i] = img[:,:,i]*shiftAmts[i]
     return shiftedImg
         
+#def RandomCropper(img, ):
