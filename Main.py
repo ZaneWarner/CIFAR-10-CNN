@@ -16,6 +16,8 @@
 # Adding Batch Normalizaiton helped reduce the degree of overfitting, but insufficiently
 # Adding max-pool dropout helped reduce the degree of overfitting, but insufficiently
 # Adding horizontal image flips with minor random hue shift only provided negligible improvement in the overfitting problem
+# Adding L2 regularization significantly helped the overfitting problem
+# Adding a third conv layer to reduce the number of filters helped the overfitting problem
 
 
 import numpy as np
@@ -111,7 +113,7 @@ def makeTwoConvLayersGraph(x):
     return fc4, l2regularizer
 
 outputLayer, regularizer  = makeTwoConvLayersGraph(x)
-beta=50
+beta=100
 loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer) + beta*regularizer
 numCorrect = tf.reduce_sum(tf.cast(tf.equal(tf.argmax(outputLayer, axis=1), y), tf.float32))
 
@@ -177,8 +179,8 @@ def runNN(session, xIn, yIn, trainer=None, epochs=1, batchSize=100, printEvery =
         #print('Validation')
         #runNN(sess, validationInputData, validationOutputLabels, trainer=None, batchSize=10, lossPlot=True)
 
-testBatchSizes = [50] #[10, 25, 50, 100, 200, 400, 800, 2000]
-testLearningRates = [1e-5] #[1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10]
+testBatchSizes = [10, 25, 50, 100, 200, 400, 800, 2000]
+testLearningRates = [1e-3, 1e-4, 5e-5, 1e-5, 5e-6, 1e-6, 1e-7, 1e-8,]
 testAccuracies = np.zeros([8,10])
 for i in range(len(testBatchSizes)):
     for j in range(len(testLearningRates)):
@@ -188,7 +190,7 @@ for i in range(len(testBatchSizes)):
         with tf.Session() as sess:
             with tf.device("/gpu:0"):
                 sess.run(tf.global_variables_initializer())
-                runNN(sess, inputData, outputLabels, trainer=trainer, batchSize=testBatchSizes[i], epochs=40, printEvery=5, lossPlot=False)
+                runNN(sess, inputData, outputLabels, trainer=trainer, batchSize=testBatchSizes[i], epochs=65, printEvery=5, lossPlot=False)
                 print('Validation for Batch Size {}, Learning Rate {}'.format(testBatchSizes[i], testLearningRates[j]))
                 testLossVals, testAccuracyVals = runNN(sess, validationInputData, validationOutputLabels, batchSize=1000, trainer=None, lossPlot=False, printEvery=5)
                 testAccuracies[i, j] = testAccuracyVals[0]
