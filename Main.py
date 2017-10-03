@@ -106,8 +106,8 @@ def makeTwoConvLayersGraph(x):
     return fc3, l2regularizer
 
 outputLayer, regularizer  = makeTwoConvLayersGraph(x)
-beta = .1
-loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer) - beta*regularizer
+beta = .5
+loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer) + beta*regularizer
 numCorrect = tf.reduce_sum(tf.cast(tf.equal(tf.argmax(outputLayer, axis=1), y), tf.float32))
 
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
