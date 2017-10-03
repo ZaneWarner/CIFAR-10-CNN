@@ -51,29 +51,29 @@ for i in [1,2,3]:
     np.append(outputLabels, np.array(imageDataDicts[i][b'labels']), axis=0)
     
 inputData = np.float64(inputData.reshape(-1, 32, 32, 3))
-channel1Mean = np.mean(inputData[:,:,:,0])
-channel2Mean = np.mean(inputData[:,:,:,1])
-channel3Mean = np.mean(inputData[:,:,:,2])
-inputData[:,:,:,0] -= channel1Mean
-inputData[:,:,:,1] -= channel2Mean
-inputData[:,:,:,2] -= channel3Mean
-
-augmentedData = np.zeros(inputData.shape)
-for i in range(len(inputData[:,0,0,0])):
-    img = inputData[i,:,:,:]
-    newImg = RandomHueShift(HorizontalFlip(img))
-    augmentedData[i,:,:,:] = newImg
-inputData = np.append(inputData, augmentedData, 0)
-outputLabels = np.append(outputLabels, outputLabels, 0)
-
-validationDataDict = unpickle('cifar-10-batches-py/data_batch_5')
-validationInputData = validationDataDict[b'data']
-validationOutputLabels = np.array(validationDataDict[b'labels'])
-
-validationInputData = np.float64(validationInputData.reshape(-1, 32, 32, 3))
-validationInputData[:,:,:,0] -= channel1Mean
-validationInputData[:,:,:,1] -= channel2Mean
-validationInputData[:,:,:,2] -= channel3Mean
+# channel1Mean = np.mean(inputData[:,:,:,0])
+# channel2Mean = np.mean(inputData[:,:,:,1])
+# channel3Mean = np.mean(inputData[:,:,:,2])
+# inputData[:,:,:,0] -= channel1Mean
+# inputData[:,:,:,1] -= channel2Mean
+# inputData[:,:,:,2] -= channel3Mean
+# 
+# augmentedData = np.zeros(inputData.shape)
+# for i in range(len(inputData[:,0,0,0])):
+#     img = inputData[i,:,:,:]
+#     newImg = RandomHueShift(HorizontalFlip(img))
+#     augmentedData[i,:,:,:] = newImg
+# inputData = np.append(inputData, augmentedData, 0)
+# outputLabels = np.append(outputLabels, outputLabels, 0)
+# 
+# validationDataDict = unpickle('cifar-10-batches-py/data_batch_5')
+# validationInputData = validationDataDict[b'data']
+# validationOutputLabels = np.array(validationDataDict[b'labels'])
+# 
+# validationInputData = np.float64(validationInputData.reshape(-1, 32, 32, 3))
+# validationInputData[:,:,:,0] -= channel1Mean
+# validationInputData[:,:,:,1] -= channel2Mean
+# validationInputData[:,:,:,2] -= channel3Mean
 
 ##### Graph Creation #####
 x = tf.placeholder(tf.float32, [None, 32, 32, 3])
@@ -88,6 +88,7 @@ def makeTwoConvLayersGraph(x):
     bias1 = tf.get_variable("bias1", [16])
     filter2 = tf.get_variable("filter2", [16,16,16,16])
     bias2 = tf.get_variable("bias2", [16])
+    bias3 = tf.get_variable("bias3", [1000])
     
     #Build Graph
     c1 = tf.nn.conv2d(x, filter1, strides=[1,1,1,1], padding="SAME", name="c1") + bias1
@@ -101,9 +102,14 @@ def makeTwoConvLayersGraph(x):
     drpo2 = tf.layers.dropout(bn2, rate=.5, name="drpo2")
     mp2 = tf.nn.max_pool(drpo2, ksize=[1,2,2,1], strides=[1,2,2,1], padding="SAME", name='mp2')
     bn2Flat = tf.reshape(mp2, [-1, 8*8*16])
-    fc3 = tf.layers.dense(bn2Flat, units=10, name="fc3") #note that this name will be made weird by the autoaddition of a bias node
-    l2regularizer = tf.nn.l2_loss(filter1, name="filter1Reg") + tf.nn.l2_loss(filter2, name="filter2Reg")
-    return fc3, l2regularizer
+    fc3Biasless = tf.layers.dense(bn2Flat, units=1000, use_bias=False, name="fc3")
+    fc3 = fc3Biasless + bias3
+    a3 = tf.nn.relu(fc3, name="a3")
+    bn3 = tf.layers.batch_normalization(a3, training=trainingMode, name="bn3")
+    drpo3 = tf.layers.dropout(bn3, rate=.5, name="drpo3")
+    fc4 = tf.layers.dense(drpo3, units=10, name="fc4")
+    l2regularizer = tf.nn.l2_loss(filter1, name="filter1Reg") + tf.nn.l2_loss(filter2, name="filter2Reg") + tf.nn.l2_loss(fc3Biasless, name="fc3Reg")
+    return fc4, l2regularizer
 
 outputLayer, regularizer  = makeTwoConvLayersGraph(x)
 beta = 50
