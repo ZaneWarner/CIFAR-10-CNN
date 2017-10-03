@@ -51,36 +51,36 @@ for i in [1,2,3]:
     np.append(outputLabels, np.array(imageDataDicts[i][b'labels']), axis=0)
     
 inputData = np.float64(inputData.reshape(-1, 32, 32, 3))
-# channel1Mean = np.mean(inputData[:,:,:,0])
-# channel2Mean = np.mean(inputData[:,:,:,1])
-# channel3Mean = np.mean(inputData[:,:,:,2])
-# inputData[:,:,:,0] -= channel1Mean
-# inputData[:,:,:,1] -= channel2Mean
-# inputData[:,:,:,2] -= channel3Mean
-# 
-# augmentedData = np.zeros(inputData.shape)
-# for i in range(len(inputData[:,0,0,0])):
-#     img = inputData[i,:,:,:]
-#     newImg = RandomHueShift(HorizontalFlip(img))
-#     augmentedData[i,:,:,:] = newImg
-# inputData = np.append(inputData, augmentedData, 0)
-# outputLabels = np.append(outputLabels, outputLabels, 0)
-# 
-# validationDataDict = unpickle('cifar-10-batches-py/data_batch_5')
-# validationInputData = validationDataDict[b'data']
-# validationOutputLabels = np.array(validationDataDict[b'labels'])
-# 
-# validationInputData = np.float64(validationInputData.reshape(-1, 32, 32, 3))
-# validationInputData[:,:,:,0] -= channel1Mean
-# validationInputData[:,:,:,1] -= channel2Mean
-# validationInputData[:,:,:,2] -= channel3Mean
+channel1Mean = np.mean(inputData[:,:,:,0])
+channel2Mean = np.mean(inputData[:,:,:,1])
+channel3Mean = np.mean(inputData[:,:,:,2])
+inputData[:,:,:,0] -= channel1Mean
+inputData[:,:,:,1] -= channel2Mean
+inputData[:,:,:,2] -= channel3Mean
+ 
+augmentedData = np.zeros(inputData.shape)
+for i in range(len(inputData[:,0,0,0])):
+    img = inputData[i,:,:,:]
+    newImg = RandomHueShift(HorizontalFlip(img))
+    augmentedData[i,:,:,:] = newImg
+inputData = np.append(inputData, augmentedData, 0)
+outputLabels = np.append(outputLabels, outputLabels, 0)
+ 
+validationDataDict = unpickle('cifar-10-batches-py/data_batch_5')
+validationInputData = validationDataDict[b'data']
+validationOutputLabels = np.array(validationDataDict[b'labels'])
+ 
+validationInputData = np.float64(validationInputData.reshape(-1, 32, 32, 3))
+validationInputData[:,:,:,0] -= channel1Mean
+validationInputData[:,:,:,1] -= channel2Mean
+validationInputData[:,:,:,2] -= channel3Mean
 
 ##### Graph Creation #####
 x = tf.placeholder(tf.float32, [None, 32, 32, 3])
 y = tf.placeholder(tf.int64, [None])
 trainingMode = tf.placeholder(tf.bool) #True indicates that it is training, false is test time
 
-def makeTwoConvLayersGraph(x):
+def makeTwoConvLayersGraph(x, beta1=50, beta2=.5):
     #This creates the graph for a network that goes conv-relu-conv-relu-affine
     #The output is not activated after the dense later since it is designed to be fed to a loss function (e.g. a softmax)
     #Initialize variables
@@ -108,12 +108,11 @@ def makeTwoConvLayersGraph(x):
     bn3 = tf.layers.batch_normalization(a3, training=trainingMode, name="bn3")
     drpo3 = tf.layers.dropout(bn3, rate=.5, name="drpo3")
     fc4 = tf.layers.dense(drpo3, units=10, name="fc4")
-    l2regularizer = tf.nn.l2_loss(filter1, name="filter1Reg") + tf.nn.l2_loss(filter2, name="filter2Reg") + tf.nn.l2_loss(fc3Biasless, name="fc3Reg")
+    l2regularizer = beta1*(tf.nn.l2_loss(filter1, name="filter1Reg") + tf.nn.l2_loss(filter2, name="filter2Reg")) + beta2*tf.nn.l2_loss(fc3Biasless, name="fc3Reg")
     return fc4, l2regularizer
 
 outputLayer, regularizer  = makeTwoConvLayersGraph(x)
-beta = 50
-loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer) + beta*regularizer
+loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer) + regularizer
 numCorrect = tf.reduce_sum(tf.cast(tf.equal(tf.argmax(outputLayer, axis=1), y), tf.float32))
 
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
