@@ -6,14 +6,16 @@
 ##########
 
 ##TODO
-# Add max pooling with dropout to see if it fixes the overfitting problem
-# Tune hyperparams (batch size and learning rate)
+# Might just need to bust out L2 reg to solve overfitting
+# Random image cropping sounds like a pain to implement but could also help
+# Tune hyperparams (batch size and learning rate, regularization beta and dropout probability)
 
 ##Testing Notes
 # First sweep of learning rates found optimal rate to be 1e(-5 +/- 1)
 # First batch size sweep found extensive overfitting even at small batch sizes.
-# Adding Batch Normalizaiton was insufficient regularization to prevent overfitting
+# Adding Batch Normalizaiton helped reduce the degree of overfitting, but insufficiently
 # Adding max-pool dropout helped reduce the degree of overfitting, but insufficiently
+# Adding horizontal image flips with minor random hue shift only provided negligible improvement in the overfitting problem
 
 
 import numpy as np
@@ -100,10 +102,12 @@ def makeTwoConvLayersGraph(x):
     bn2 = tf.layers.batch_normalization(mp2, axis=3, training=trainingMode, name="bn2")
     bn2Flat = tf.reshape(bn2, [-1, 8*8*16])
     fc3 = tf.layers.dense(bn2Flat, units=10, name="fc3") #note that this name will be made weird by the autoaddition of a bias node
-    return fc3
+    l2regularizer = tf.nn.l2_loss(filter1, name="filter1Reg") + tf.nn.l2_loss(filter2, name="filter2Reg")
+    return fc3, l2regularizer
 
-outputLayer = makeTwoConvLayersGraph(x)
-loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer)
+outputLayer, regularizer  = makeTwoConvLayersGraph(x)
+beta = .1
+loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer) - beta*regularizer
 numCorrect = tf.reduce_sum(tf.cast(tf.equal(tf.argmax(outputLayer, axis=1), y), tf.float32))
 
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
