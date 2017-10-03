@@ -88,6 +88,8 @@ def makeTwoConvLayersGraph(x):
     bias1 = tf.get_variable("bias1", [16])
     filter2 = tf.get_variable("filter2", [16,16,16,16])
     bias2 = tf.get_variable("bias2", [16])
+    filter3 = tf.get_variable("filter3", [16,16,16,8])
+    bias3 = tf.get_variable("bias3", [8])
     
     #Build Graph
     c1 = tf.nn.conv2d(x, filter1, strides=[1,1,1,1], padding="SAME", name="c1") + bias1
@@ -100,10 +102,13 @@ def makeTwoConvLayersGraph(x):
     bn2 = tf.layers.batch_normalization(a2, axis=3, training=trainingMode, name="bn2")
     drpo2 = tf.layers.dropout(bn2, rate=.5, name="drpo2")
     mp2 = tf.nn.max_pool(drpo2, ksize=[1,2,2,1], strides=[1,2,2,1], padding="SAME", name='mp2')
-    bn2Flat = tf.reshape(mp2, [-1, 8*8*16])
-    fc3 = tf.layers.dense(bn2Flat, units=10, name="fc3")
-    l2regularizer = tf.nn.l2_loss(filter1, name="filter1Reg") + tf.nn.l2_loss(filter2, name="filter2Reg")
-    return fc3, l2regularizer
+    c3 = tf.nn.conv2d(mp2, filter3, strides=[1,1,1,1], padding="SAME", name="c3") + bias3
+    a3 = tf.nn.relu(c3, name="a3")
+    bn3 = tf.layers.batch_normalization(a3, axis=3, training=trainingMode, name="bn3")
+    bn3Flat = tf.reshape(bn3, [-1, 8*8*8])
+    fc4 = tf.layers.dense(bn3Flat, units=10, name="fc3")
+    l2regularizer = tf.nn.l2_loss(filter1, name="filter1Reg") + tf.nn.l2_loss(filter2, name="filter2Reg") + tf.nn.l2_loss(filter3, name="filter3Reg")
+    return fc4, l2regularizer
 
 outputLayer, regularizer  = makeTwoConvLayersGraph(x)
 beta=50
