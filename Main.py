@@ -92,21 +92,21 @@ def makeTwoConvLayersGraph(x):
     #Build Graph
     c1 = tf.nn.conv2d(x, filter1, strides=[1,1,1,1], padding="SAME", name="c1") + bias1
     a1 = tf.nn.relu(c1, name="a1")
-    drpo1 = tf.layers.dropout(a1, rate=.5, name="drpo1")
+    bn1 = tf.layers.batch_normalization(a1, axis=3, training=trainingMode, name="bn1")
+    drpo1 = tf.layers.dropout(bn1, rate=.5, name="drpo1")
     mp1 = tf.nn.max_pool(drpo1, ksize=[1,2,2,1], strides=[1,2,2,1], padding="SAME", name='mp1')
-    bn1 = tf.layers.batch_normalization(mp1, axis=3, training=trainingMode, name="bn1")
-    c2 = tf.nn.conv2d(bn1, filter2, strides=[1,1,1,1], padding="SAME", name="c2") + bias2
+    c2 = tf.nn.conv2d(mp1, filter2, strides=[1,1,1,1], padding="SAME", name="c2") + bias2
     a2 = tf.nn.relu(c2, name="a2")
-    drpo2 = tf.layers.dropout(a2, rate=.5, name="drpo2")
+    bn2 = tf.layers.batch_normalization(a2, axis=3, training=trainingMode, name="bn2")
+    drpo2 = tf.layers.dropout(bn2, rate=.5, name="drpo2")
     mp2 = tf.nn.max_pool(drpo2, ksize=[1,2,2,1], strides=[1,2,2,1], padding="SAME", name='mp2')
-    bn2 = tf.layers.batch_normalization(mp2, axis=3, training=trainingMode, name="bn2")
-    bn2Flat = tf.reshape(bn2, [-1, 8*8*16])
+    bn2Flat = tf.reshape(mp2, [-1, 8*8*16])
     fc3 = tf.layers.dense(bn2Flat, units=10, name="fc3") #note that this name will be made weird by the autoaddition of a bias node
     l2regularizer = tf.nn.l2_loss(filter1, name="filter1Reg") + tf.nn.l2_loss(filter2, name="filter2Reg")
     return fc3, l2regularizer
 
 outputLayer, regularizer  = makeTwoConvLayersGraph(x)
-beta = 10
+beta = 50
 loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer) + beta*regularizer
 numCorrect = tf.reduce_sum(tf.cast(tf.equal(tf.argmax(outputLayer, axis=1), y), tf.float32))
 
