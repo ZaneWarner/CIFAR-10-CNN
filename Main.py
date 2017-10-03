@@ -80,7 +80,7 @@ x = tf.placeholder(tf.float32, [None, 32, 32, 3])
 y = tf.placeholder(tf.int64, [None])
 trainingMode = tf.placeholder(tf.bool) #True indicates that it is training, false is test time
 
-def makeTwoConvLayersGraph(x, beta1=50, beta2=.5):
+def makeTwoConvLayersGraph(x):
     #This creates the graph for a network that goes conv-relu-conv-relu-affine
     #The output is not activated after the dense later since it is designed to be fed to a loss function (e.g. a softmax)
     #Initialize variables
@@ -88,7 +88,6 @@ def makeTwoConvLayersGraph(x, beta1=50, beta2=.5):
     bias1 = tf.get_variable("bias1", [16])
     filter2 = tf.get_variable("filter2", [16,16,16,16])
     bias2 = tf.get_variable("bias2", [16])
-    bias3 = tf.get_variable("bias3", [1000])
     
     #Build Graph
     c1 = tf.nn.conv2d(x, filter1, strides=[1,1,1,1], padding="SAME", name="c1") + bias1
@@ -102,17 +101,13 @@ def makeTwoConvLayersGraph(x, beta1=50, beta2=.5):
     drpo2 = tf.layers.dropout(bn2, rate=.5, name="drpo2")
     mp2 = tf.nn.max_pool(drpo2, ksize=[1,2,2,1], strides=[1,2,2,1], padding="SAME", name='mp2')
     bn2Flat = tf.reshape(mp2, [-1, 8*8*16])
-    fc3Biasless = tf.layers.dense(bn2Flat, units=1000, use_bias=False, name="fc3")
-    fc3 = fc3Biasless + bias3
-    a3 = tf.nn.relu(fc3, name="a3")
-    bn3 = tf.layers.batch_normalization(a3, training=trainingMode, name="bn3")
-    drpo3 = tf.layers.dropout(bn3, rate=.5, name="drpo3")
-    fc4 = tf.layers.dense(drpo3, units=10, name="fc4")
-    l2regularizer = beta1*(tf.nn.l2_loss(filter1, name="filter1Reg") + tf.nn.l2_loss(filter2, name="filter2Reg")) + beta2*tf.nn.l2_loss(fc3Biasless, name="fc3Reg")
-    return fc4, l2regularizer
+    fc3 = tf.layers.dense(bn2Flat, units=10, name="fc3")
+    l2regularizer = tf.nn.l2_loss(filter1, name="filter1Reg") + tf.nn.l2_loss(filter2, name="filter2Reg")
+    return fc3, l2regularizer
 
 outputLayer, regularizer  = makeTwoConvLayersGraph(x)
-loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer) + regularizer
+beta=50
+loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer) + beta*regularizer
 numCorrect = tf.reduce_sum(tf.cast(tf.equal(tf.argmax(outputLayer, axis=1), y), tf.float32))
 
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
