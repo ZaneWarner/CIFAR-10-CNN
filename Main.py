@@ -19,6 +19,7 @@
 # Adding a third conv layer to reduce the number of filters helped the overfitting problem
 # Re-sweeping learning rates and batch sizes in a lattice found best results with learning rate around 1e-5 (bounded by worse performance at 5e-5 and 5e-6, with 5e-6 much closer)
 #     and batch size of 100 (bounded by worse performance at 50 and 200)
+#Testing dropout probabilities found .5 to be the optimal (with bounds of .45 and .55 on either side)
 
 import numpy as np
 import tensorflow as tf
@@ -82,7 +83,7 @@ x = tf.placeholder(tf.float32, [None, 32, 32, 3])
 y = tf.placeholder(tf.int64, [None])
 trainingMode = tf.placeholder(tf.bool) #True indicates that it is training, false is test time
 
-def makeTwoConvLayersGraph(x, dropoutProb=.6):
+def makeTwoConvLayersGraph(x, dropoutProb=.5, betaConv=100, betaFC=.1):
     #This creates the graph for a network that goes conv-relu-conv-relu-affine
     #The output is not activated after the dense later since it is designed to be fed to a loss function (e.g. a softmax)
     #Initialize variables
@@ -92,6 +93,8 @@ def makeTwoConvLayersGraph(x, dropoutProb=.6):
     bias2 = tf.get_variable("bias2", [16])
     filter3 = tf.get_variable("filter3", [16,16,16,8])
     bias3 = tf.get_variable("bias3", [8])
+    fcWeights4 = tf.get_variable("fcWeights4", [512, 1000])
+    fcBias4 = tf.get_variable("fcBias4", [1000])
     
     #Build Graph
     c1 = tf.nn.conv2d(x, filter1, strides=[1,1,1,1], padding="SAME", name="c1") + bias1
@@ -108,13 +111,19 @@ def makeTwoConvLayersGraph(x, dropoutProb=.6):
     a3 = tf.nn.relu(c3, name="a3")
     bn3 = tf.layers.batch_normalization(a3, axis=3, training=trainingMode, name="bn3")
     bn3Flat = tf.reshape(bn3, [-1, 8*8*8])
-    fc4 = tf.layers.dense(bn3Flat, units=10, name="fc3")
-    l2regularizer = tf.nn.l2_loss(filter1, name="filter1Reg") + tf.nn.l2_loss(filter2, name="filter2Reg") + tf.nn.l2_loss(filter3, name="filter3Reg")
-    return fc4, l2regularizer
+    fc4 = tf.matmul(bn3Flat, fcWeights4) + fcBias4
+    a4 = tf.nn.relu(fc4, name="a4")
+    bn4 = tf.layers.batch_normalization(a4, training=trainingMode, name="bn4")
+    drpo4 = tf.layers.dropout(bn4, rate=dropoutProb, name="drpo4")
+    fc5 = tf.layers.dense(drpo4, 10, name="fc5")
+    
+    convRegularizer = betaConv*(tf.nn.l2_loss(filter1, name="filter1Reg") + tf.nn.l2_loss(filter2, name="filter2Reg") + tf.nn.l2_loss(filter3, name="filter3Reg"))
+    fcRegularizer =  betaFC*tf.nn.l2_loss(fcWeights4, name="fcWeights4Reg")
+    l2Regularizer = convRegularizer + fcRegularizer
+    return fc5, l2Regularizer
 
 outputLayer, regularizer  = makeTwoConvLayersGraph(x)
-beta=100
-loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer) + beta*regularizer
+loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer) + regularizer
 numCorrect = tf.reduce_sum(tf.cast(tf.equal(tf.argmax(outputLayer, axis=1), y), tf.float32))
 
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
