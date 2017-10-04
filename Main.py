@@ -6,19 +6,19 @@
 ##########
 
 ##TODO
-# Might just need to bust out L2 reg to solve overfitting
-# Random image cropping sounds like a pain to implement but could also help
+# Random image cropping sounds like a pain to implement but could also help with overfitting
 # Tune hyperparams (batch size and learning rate, regularization beta and dropout probability)
 
 ##Testing Notes
 # First sweep of learning rates found optimal rate to be 1e(-5 +/- 1)
-# First batch size sweep found extensive overfitting even at small batch sizes.
+# First batch size sweep was inconclusive but found extensive overfitting even at small batch sizes.
 # Adding Batch Normalizaiton helped reduce the degree of overfitting, but insufficiently
 # Adding max-pool dropout helped reduce the degree of overfitting, but insufficiently
 # Adding horizontal image flips with minor random hue shift only provided negligible improvement in the overfitting problem
 # Adding L2 regularization significantly helped the overfitting problem
 # Adding a third conv layer to reduce the number of filters helped the overfitting problem
-
+# Re-sweeping learning rates and batch sizes in a lattice found best results with learning rate around 1e-5 (bounded by worse performance at 5e-5 and 5e-6, with 5e-6 much closer)
+#     and batch size of 100 (bounded by worse performance at 50 and 200)
 
 import numpy as np
 import tensorflow as tf
@@ -82,7 +82,7 @@ x = tf.placeholder(tf.float32, [None, 32, 32, 3])
 y = tf.placeholder(tf.int64, [None])
 trainingMode = tf.placeholder(tf.bool) #True indicates that it is training, false is test time
 
-def makeTwoConvLayersGraph(x):
+def makeTwoConvLayersGraph(x, dropoutProb=.6):
     #This creates the graph for a network that goes conv-relu-conv-relu-affine
     #The output is not activated after the dense later since it is designed to be fed to a loss function (e.g. a softmax)
     #Initialize variables
@@ -97,12 +97,12 @@ def makeTwoConvLayersGraph(x):
     c1 = tf.nn.conv2d(x, filter1, strides=[1,1,1,1], padding="SAME", name="c1") + bias1
     a1 = tf.nn.relu(c1, name="a1")
     bn1 = tf.layers.batch_normalization(a1, axis=3, training=trainingMode, name="bn1")
-    drpo1 = tf.layers.dropout(bn1, rate=.5, name="drpo1")
+    drpo1 = tf.layers.dropout(bn1, rate=dropoutProb, name="drpo1")
     mp1 = tf.nn.max_pool(drpo1, ksize=[1,2,2,1], strides=[1,2,2,1], padding="SAME", name='mp1')
     c2 = tf.nn.conv2d(mp1, filter2, strides=[1,1,1,1], padding="SAME", name="c2") + bias2
     a2 = tf.nn.relu(c2, name="a2")
     bn2 = tf.layers.batch_normalization(a2, axis=3, training=trainingMode, name="bn2")
-    drpo2 = tf.layers.dropout(bn2, rate=.5, name="drpo2")
+    drpo2 = tf.layers.dropout(bn2, rate=dropoutProb, name="drpo2")
     mp2 = tf.nn.max_pool(drpo2, ksize=[1,2,2,1], strides=[1,2,2,1], padding="SAME", name='mp2')
     c3 = tf.nn.conv2d(mp2, filter3, strides=[1,1,1,1], padding="SAME", name="c3") + bias3
     a3 = tf.nn.relu(c3, name="a3")
@@ -171,33 +171,33 @@ def runNN(session, xIn, yIn, trainer=None, epochs=1, batchSize=100, printEvery =
     return lossValues, accuracies
 
 #### Execution #####
-# with tf.Session() as sess:
-#     with tf.device("/cpu:0"):
-#         sess.run(tf.global_variables_initializer())
-#         print('Training')
-#         runNN(sess, inputData[:100,:], outputLabels[:100,], trainer=trainer, batchSize=50, epochs=2, printEvery=2, lossPlot=True)
-        #print('Validation')
-        #runNN(sess, validationInputData, validationOutputLabels, trainer=None, batchSize=10, lossPlot=True)
+with tf.Session() as sess:
+    with tf.device("/gpu:0"):
+        sess.run(tf.global_variables_initializer())
+        print('Training')
+        runNN(sess, inputData, outputLabels, trainer=trainer, epochs=65, printEvery=5, lossPlot=False)
+        print('Validation')
+        runNN(sess, validationInputData, validationOutputLabels, trainer=None, batchSize=1000, lossPlot=False)
 
-testBatchSizes = [10, 25, 50, 100, 200, 400, 800, 2000]
-testLearningRates = [1e-3, 1e-4, 5e-5, 1e-5, 5e-6, 1e-6, 1e-7, 1e-8,]
-testAccuracies = np.zeros([8,10])
-for i in range(len(testBatchSizes)):
-    for j in range(len(testLearningRates)):
-        optimizer = tf.train.AdamOptimizer(testLearningRates[j])
-        with tf.control_dependencies(update_ops):
-            trainer = optimizer.minimize(loss)
-        with tf.Session() as sess:
-            with tf.device("/gpu:0"):
-                sess.run(tf.global_variables_initializer())
-                runNN(sess, inputData, outputLabels, trainer=trainer, batchSize=testBatchSizes[i], epochs=65, printEvery=5, lossPlot=False)
-                print('Validation for Batch Size {}, Learning Rate {}'.format(testBatchSizes[i], testLearningRates[j]))
-                testLossVals, testAccuracyVals = runNN(sess, validationInputData, validationOutputLabels, batchSize=1000, trainer=None, lossPlot=False, printEvery=5)
-                testAccuracies[i, j] = testAccuracyVals[0]
-  
-print("Test Accuracy Matrix (Rows by Batch Size, Cols by Learning Rate):")
-print(testAccuracies)
-topAccuracyIndex = np.argmax(testAccuracies)
-topAccuracyIndexBS = topAccuracyIndex // 10
-topAccuracyIndexLR = topAccuracyIndex % 10
-print("Highest Test Accuracy Obtained at Indices {},{}".format(topAccuracyIndexBS, topAccuracyIndexLR))
+# testBatchSizes = [10, 25, 50, 100, 200, 400, 800, 2000]
+# testLearningRates = [1e-3, 1e-4, 5e-5, 1e-5, 5e-6, 1e-6, 1e-7, 1e-8,]
+# testAccuracies = np.zeros([8,10])
+# for i in range(len(testBatchSizes)):
+#     for j in range(len(testLearningRates)):
+#         optimizer = tf.train.AdamOptimizer(testLearningRates[j])
+#         with tf.control_dependencies(update_ops):
+#             trainer = optimizer.minimize(loss)
+#         with tf.Session() as sess:
+#             with tf.device("/gpu:0"):
+#                 sess.run(tf.global_variables_initializer())
+#                 runNN(sess, inputData, outputLabels, trainer=trainer, batchSize=testBatchSizes[i], epochs=65, printEvery=5, lossPlot=False)
+#                 print('Validation for Batch Size {}, Learning Rate {}'.format(testBatchSizes[i], testLearningRates[j]))
+#                 testLossVals, testAccuracyVals = runNN(sess, validationInputData, validationOutputLabels, batchSize=1000, trainer=None, lossPlot=False, printEvery=5)
+#                 testAccuracies[i, j] = testAccuracyVals[0]
+#   
+# print("Test Accuracy Matrix (Rows by Batch Size, Cols by Learning Rate):")
+# print(testAccuracies)
+# topAccuracyIndex = np.argmax(testAccuracies)
+# topAccuracyIndexBS = topAccuracyIndex // 10
+# topAccuracyIndexLR = topAccuracyIndex % 10
+# print("Highest Test Accuracy Obtained at Indices {},{}".format(topAccuracyIndexBS, topAccuracyIndexLR))
