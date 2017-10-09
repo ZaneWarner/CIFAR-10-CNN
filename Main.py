@@ -78,7 +78,7 @@ x = tf.placeholder(tf.float32, [None, 28, 28, 3]) #The 28s depend on the amount 
 y = tf.placeholder(tf.int64, [None])
 trainingMode = tf.placeholder(tf.bool) #True indicates that it is training, false is test time
 
-def makeTwoConvLayersGraph(x, dropoutProb=.5, betaConv=100, betaFC=.1):
+def makeTwoConvLayersGraph(x, dropoutProb=.5, betaConv=0, betaFC=0):
     #This creates the graph for a network that goes conv-relu-conv-relu-affine
     #The output is not activated after the dense later since it is designed to be fed to a loss function (e.g. a softmax)
     #Initialize variables
@@ -168,7 +168,7 @@ def runNN(session, xIn, yIn, trainer=None, epochs=1, batchSize=100, printEvery =
                           trainingMode : True}
                 batchLossValue, correct, _ = session.run([loss, numCorrect, trainer], feed_dict = values)
             else:
-                values = {x : xIn[np.array(thisBatch)],
+                values = {x : xAugmented[np.array(thisBatch)],
                           y : yIn[np.array(thisBatch)],
                           trainingMode : False}
                 batchLossValue, correct = session.run([loss, numCorrect], feed_dict = values)
