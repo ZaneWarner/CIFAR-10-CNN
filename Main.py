@@ -190,7 +190,7 @@ def runNN(session, xIn, yIn, trainer=None, epochs=1, batchSize=100, printEvery =
 
 #### Execution #####
 with tf.Session() as sess:
-    with tf.device("/cpu:0"):
+    with tf.device("/gpu:0"):
         sess.run(tf.global_variables_initializer())
         print('Training')
         runNN(sess, inputData, outputLabels, trainer=trainer, epochs=81, printEvery=10, lossPlot=False)
