@@ -6,20 +6,23 @@
 ##########
 
 ##TODO
-# Random image cropping sounds like a pain to implement but could also help with overfitting
+# Random image cropping is spooky in testing phase, rescaling to avoid stochasitcity could be better but is hard
 # Tune hyperparams (batch size and learning rate, regularization beta and dropout probability)
+#   LR might be too high, testing with betas .1/.01 plateau'd at epoch 41 (could also be overregularization)
 
 ##Testing Notes
-# First sweep of learning rates found optimal rate to be 1e(-5 +/- 1)
-# First batch size sweep was inconclusive but found extensive overfitting even at small batch sizes.
-# Adding Batch Normalizaiton helped reduce the degree of overfitting, but insufficiently
-# Adding max-pool dropout helped reduce the degree of overfitting, but insufficiently
-# Adding horizontal image flips with minor random hue shift only provided negligible improvement in the overfitting problem
-# Adding L2 regularization significantly helped the overfitting problem
-# Adding a third conv layer to reduce the number of filters helped the overfitting problem
-# Re-sweeping learning rates and batch sizes in a lattice found best results with learning rate around 1e-5 (bounded by worse performance at 5e-5 and 5e-6, with 5e-6 much closer)
-#     and batch size of 100 (bounded by worse performance at 50 and 200)
-#Testing dropout probabilities found .5 to be the optimal (with bounds of .45 and .55 on either side)
+# New deeper architecture
+# With LR 5e-3 and BS 100, 151 epochs:
+#   B1=0, B2=0: .8766 / .5254, training acc continuing to improve w training
+#   B1=100, B2=0: .3623 / .199, training plateau v quick
+#   B1=10, B2=0: .4293 / .1595, training plateau around 111
+#   B1=1, B2=0: .5107 / .4089
+#   B1=.5 B2=0, .5713 / .4058
+#   B1=.1 B2=0, .7128 / .4407
+#   B1=.1 B2=.1, .4136 / .3585
+#   B1=.1 B2=.01, .4265 / .3592
+
+
 
 import numpy as np
 import tensorflow as tf
@@ -78,18 +81,22 @@ x = tf.placeholder(tf.float32, [None, 28, 28, 3]) #The 28s depend on the amount 
 y = tf.placeholder(tf.int64, [None])
 trainingMode = tf.placeholder(tf.bool) #True indicates that it is training, false is test time
 
-def makeTwoConvLayersGraph(x, dropoutProb=.5, betaConv=0, betaFC=0):
+def makeTwoConvLayersGraph(x, dropoutProb=.5, betaConv=.1, betaFC=.01):
     #This creates the graph for a network that goes conv-relu-conv-relu-affine
     #The output is not activated after the dense later since it is designed to be fed to a loss function (e.g. a softmax)
     #Initialize variables
-    filter1 = tf.get_variable("filter1", [2,2,3,16])
-    bias1 = tf.get_variable("bias1", [16])
-    filter2 = tf.get_variable("filter2", [2,2,16,16])
+    filter1 = tf.get_variable("filter1", [2,2,3,32])
+    bias1 = tf.get_variable("bias1", [32])
+    filter2 = tf.get_variable("filter2", [2,2,32,16])
     bias2 = tf.get_variable("bias2", [16])
     filter3 = tf.get_variable("filter3", [2,2,16,8])
     bias3 = tf.get_variable("bias3", [8])
-    fcWeights4 = tf.get_variable("fcWeights4", [7*7*8, 1000]) #these dimensions depend on the amount of random cropping
-    fcBias4 = tf.get_variable("fcBias4", [1000])
+    filter4 = tf.get_variable("filter4", [2,2,8,8])
+    bias4 = tf.get_variable("bias4", [8])
+    fcWeights5 = tf.get_variable("fcWeights5", [7*7*8, 1000]) #these dimensions depend on the amount of random cropping
+    fcBias5 = tf.get_variable("fcBias5", [1000])
+    fcWeights6 = tf.get_variable("fcWeights6", [1000, 1000])
+    fcBias6 = tf.get_variable("fcBias6", [1000])
     
     #Build Graph
     # conv-relu-bn-dropout-maxpool 1
@@ -108,20 +115,29 @@ def makeTwoConvLayersGraph(x, dropoutProb=.5, betaConv=0, betaFC=0):
     c3 = tf.nn.conv2d(mp2, filter3, strides=[1,1,1,1], padding="SAME", name="c3") + bias3
     a3 = tf.nn.relu(c3, name="a3")
     bn3 = tf.layers.batch_normalization(a3, axis=3, training=trainingMode, name="bn3")
-    bn3Flat = tf.reshape(bn3, [-1, 7*7*8]) #these dimensions depend on the amount of random cropping
+    # conv-relu-bn
+    c4 = tf.nn.conv2d(bn3, filter4, strides=[1,1,1,1], padding="SAME", name="c4") + bias4
+    a4 = tf.nn.relu(c4, name="a4")
+    bn4 = tf.layers.batch_normalization(a4, axis=3, training=trainingMode, name="bn4")
+    bn4Flat = tf.reshape(bn4, [-1, 7*7*8]) #these dimensions depend on the amount of random cropping
     # fc-relu-bn-dropout
-    fc4 = tf.matmul(bn3Flat, fcWeights4) + fcBias4 #A 1000 hidden unit layer, done manually to make regularization more straightforward
-    a4 = tf.nn.relu(fc4, name="a4")
-    bn4 = tf.layers.batch_normalization(a4, training=trainingMode, name="bn4")
-    drpo4 = tf.layers.dropout(bn4, rate=dropoutProb, name="drpo4")
+    fc5 = tf.matmul(bn4Flat, fcWeights5) + fcBias5 #A 1000 hidden unit layer, done manually to make regularization more straightforward
+    a5 = tf.nn.relu(fc5, name="a5")
+    bn5 = tf.layers.batch_normalization(a5, training=trainingMode, name="bn5")
+    drpo5 = tf.layers.dropout(bn5, rate=dropoutProb, name="drpo5")
+    # fc-relu-bn-dropout
+    fc6 = tf.matmul(drpo5, fcWeights6) + fcBias6 #A 1000 hidden unit layer, done manually to make regularization more straightforward
+    a6 = tf.nn.relu(fc6, name="a6")
+    bn6 = tf.layers.batch_normalization(a6, training=trainingMode, name="bn6")
+    drpo6 = tf.layers.dropout(bn6, rate=dropoutProb, name="drpo6")
     # fc output
-    fc5 = tf.layers.dense(drpo4, 10, name="fc5")
+    fc7 = tf.layers.dense(drpo6, 10, name="fc7")
     
     #regularization
-    convRegularizer = betaConv*(tf.nn.l2_loss(filter1, name="filter1Reg") + tf.nn.l2_loss(filter2, name="filter2Reg") + tf.nn.l2_loss(filter3, name="filter3Reg"))
-    fcRegularizer =  betaFC*tf.nn.l2_loss(fcWeights4, name="fcWeights4Reg")
+    convRegularizer = betaConv*(tf.nn.l2_loss(filter1, name="filter1Reg") + tf.nn.l2_loss(filter2, name="filter2Reg") + tf.nn.l2_loss(filter3, name="filter3Reg") + tf.nn.l2_loss(filter4, name="filter4Reg"))
+    fcRegularizer =  betaFC*(tf.nn.l2_loss(fcWeights5, name="fcWeights5Reg") + tf.nn.l2_loss(fcWeights6, name="fcWeights6Reg"))
     l2Regularizer = convRegularizer + fcRegularizer
-    return fc5, l2Regularizer
+    return fc7, l2Regularizer
 
 outputLayer, regularizer  = makeTwoConvLayersGraph(x)
 loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer) + regularizer
@@ -129,7 +145,7 @@ numCorrect = tf.reduce_sum(tf.cast(tf.equal(tf.argmax(outputLayer, axis=1), y), 
 
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 
-optimizer = tf.train.AdamOptimizer(5e-5)
+optimizer = tf.train.AdamOptimizer(5e-3)
 with tf.control_dependencies(update_ops):
     trainer = optimizer.minimize(loss)
 
@@ -193,7 +209,7 @@ with tf.Session() as sess:
     with tf.device("/gpu:0"):
         sess.run(tf.global_variables_initializer())
         print('Training')
-        runNN(sess, inputData, outputLabels, trainer=trainer, epochs=81, printEvery=10, lossPlot=False)
+        runNN(sess, inputData, outputLabels, trainer=trainer, epochs=151, printEvery=10, lossPlot=False)
         print('Validation')
         runNN(sess, validationInputData, validationOutputLabels, trainer=None, batchSize=1000, lossPlot=False)
 
