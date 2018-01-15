@@ -7,22 +7,11 @@
 
 ##TODO
 # Random image cropping is spooky in testing phase, rescaling to avoid stochasitcity could be better but is hard
-# Tune hyperparams (batch size and learning rate, regularization beta and dropout probability)
-#   LR might be too high, testing with betas .1/.01 plateau'd at epoch 41 (could also be overregularization)
+# Everything is in upheaval cuz this is now a resnet thing
 
-##Testing Notes
-# New deeper architecture
-# With LR 5e-3 and BS 100, 151 epochs:
-#   B1=0, B2=0: .8766 / .5254, training acc continuing to improve w training
-#   B1=100, B2=0: .3623 / .199, training plateau v quick
-#   B1=10, B2=0: .4293 / .1595, training plateau around 111
-#   B1=1, B2=0: .5107 / .4089
-#   B1=.5 B2=0, .5713 / .4058
-#   B1=.1 B2=0, .7128 / .4407
-#   B1=.1 B2=.1, .4136 / .3585
-#   B1=.1 B2=.01, .4265 / .3592
-
-
+##TODO
+# ResNotes: At current settings and architecture, 16 epoch of training yields .966/.564 train/test acc
+# 6 of training yields .693/.526
 
 import numpy as np
 import tensorflow as tf
@@ -77,67 +66,77 @@ validationInputData[:,:,:,1] -= channel2Mean
 validationInputData[:,:,:,2] -= channel3Mean
 
 ##### Graph Creation #####
-x = tf.placeholder(tf.float32, [None, 28, 28, 3]) #The 28s depend on the amount of random cropping used. In particular, they should be 32 minus the amount cropped.
+x = tf.placeholder(tf.float32, [None, 32, 32, 3]) #The 28s depend on the amount of random cropping used. In particular, they should be 32 minus the amount cropped.
 y = tf.placeholder(tf.int64, [None])
 trainingMode = tf.placeholder(tf.bool) #True indicates that it is training, false is test time
 
-def makeTwoConvLayersGraph(x, dropoutProb=.5, betaConv=.1, betaFC=.01):
+def makeTwoConvLayersGraph(x, dropoutProb=.5, betaConv=0, betaFC=0):
     #This creates the graph for a network that goes conv-relu-conv-relu-affine
     #The output is not activated after the dense later since it is designed to be fed to a loss function (e.g. a softmax)
     #Initialize variables
     filter1 = tf.get_variable("filter1", [2,2,3,32])
     bias1 = tf.get_variable("bias1", [32])
-    filter2 = tf.get_variable("filter2", [2,2,32,16])
-    bias2 = tf.get_variable("bias2", [16])
-    filter3 = tf.get_variable("filter3", [2,2,16,8])
-    bias3 = tf.get_variable("bias3", [8])
-    filter4 = tf.get_variable("filter4", [2,2,8,8])
-    bias4 = tf.get_variable("bias4", [8])
-    fcWeights5 = tf.get_variable("fcWeights5", [7*7*8, 1000]) #these dimensions depend on the amount of random cropping
-    fcBias5 = tf.get_variable("fcBias5", [1000])
-    fcWeights6 = tf.get_variable("fcWeights6", [1000, 1000])
-    fcBias6 = tf.get_variable("fcBias6", [1000])
+    filter2 = tf.get_variable("filter2", [2,2,32,32])
+    bias2 = tf.get_variable("bias2", [32])
+    filter3 = tf.get_variable("filter3", [2,2,32,32])
+    bias3 = tf.get_variable("bias3", [32])
+    filter4 = tf.get_variable("filter4", [2,2,32,32])
+    bias4 = tf.get_variable("bias4", [32])
+    filter5 = tf.get_variable("filter5", [2,2,32,32])
+    bias5 = tf.get_variable("bias5", [32])
+    filter6 = tf.get_variable("filter6", [2,2,32,32])
+    bias6 = tf.get_variable("bias6", [32])
+    filter7 = tf.get_variable("filter7", [2,2,32,32])
+    bias7 = tf.get_variable("bias7", [32])
+    
+    fcWeights = tf.get_variable("fcWeights", [16*16*32, 1000]) #these dimensions depend on the amount of random cropping
+    fcBias = tf.get_variable("fcBias", [1000])
     
     #Build Graph
-    # conv-relu-bn-dropout-maxpool 1
+    # conv-relu-bn-maxpool 1
     c1 = tf.nn.conv2d(x, filter1, strides=[1,1,1,1], padding="SAME", name="c1") + bias1
     a1 = tf.nn.relu(c1, name="a1")
     bn1 = tf.layers.batch_normalization(a1, axis=3, training=trainingMode, name="bn1")
-    drpo1 = tf.layers.dropout(bn1, rate=dropoutProb, name="drpo1")
-    mp1 = tf.nn.max_pool(drpo1, ksize=[1,2,2,1], strides=[1,2,2,1], padding="SAME", name='mp1')
-    # conv-relu-bn-dropout-maxpool 2
+    mp1 = tf.nn.max_pool(bn1, ksize=[1,2,2,1], strides=[1,2,2,1], padding="SAME", name='mp1')
+    # res 1 : conv - relu - bn - conv - res_addition - relu - bn
     c2 = tf.nn.conv2d(mp1, filter2, strides=[1,1,1,1], padding="SAME", name="c2") + bias2
     a2 = tf.nn.relu(c2, name="a2")
     bn2 = tf.layers.batch_normalization(a2, axis=3, training=trainingMode, name="bn2")
-    drpo2 = tf.layers.dropout(bn2, rate=dropoutProb, name="drpo2")
-    mp2 = tf.nn.max_pool(drpo2, ksize=[1,2,2,1], strides=[1,2,2,1], padding="SAME", name='mp2')
-    # conv-relu-bn
-    c3 = tf.nn.conv2d(mp2, filter3, strides=[1,1,1,1], padding="SAME", name="c3") + bias3
-    a3 = tf.nn.relu(c3, name="a3")
-    bn3 = tf.layers.batch_normalization(a3, axis=3, training=trainingMode, name="bn3")
-    # conv-relu-bn
+    c3 = tf.nn.conv2d(bn2, filter3, strides=[1,1,1,1], padding="SAME", name="c3") + bias3
+    r1 = c3 + mp1
+    a3 = tf.nn.relu(r1, name="a3")
+    bn3 = tf.layers.batch_normalization(r1, axis=3, training=trainingMode, name="bn3")
+    # res 2 : conv - relu - bn - conv - res_addition - relu - bn
     c4 = tf.nn.conv2d(bn3, filter4, strides=[1,1,1,1], padding="SAME", name="c4") + bias4
     a4 = tf.nn.relu(c4, name="a4")
     bn4 = tf.layers.batch_normalization(a4, axis=3, training=trainingMode, name="bn4")
-    bn4Flat = tf.reshape(bn4, [-1, 7*7*8]) #these dimensions depend on the amount of random cropping
+    c5 = tf.nn.conv2d(bn4, filter5, strides=[1,1,1,1], padding="SAME", name="c5") + bias5
+    r2 = c5 + bn3
+    a5 = tf.nn.relu(r2, name="a5")
+    bn5 = tf.layers.batch_normalization(r2, axis=3, training=trainingMode, name="bn5")
+    # res 3 : conv - relu - bn - conv - res_addition - relu - bn
+    c6 = tf.nn.conv2d(bn5, filter6, strides=[1,1,1,1], padding="SAME", name="c6") + bias6
+    a6 = tf.nn.relu(c6, name="a6")
+    bn6 = tf.layers.batch_normalization(a6, axis=3, training=trainingMode, name="bn6")
+    c7 = tf.nn.conv2d(bn6, filter7, strides=[1,1,1,1], padding="SAME", name="c7") + bias7
+    r3 = c7 + bn5
+    bn7 = tf.layers.batch_normalization(r3, axis=3, training=trainingMode, name="bn7")
+    bn7Flat = tf.reshape(bn7, [-1, 16*16*32]) #these dimensions depend on the amount of random cropping
+    
     # fc-relu-bn-dropout
-    fc5 = tf.matmul(bn4Flat, fcWeights5) + fcBias5 #A 1000 hidden unit layer, done manually to make regularization more straightforward
-    a5 = tf.nn.relu(fc5, name="a5")
-    bn5 = tf.layers.batch_normalization(a5, training=trainingMode, name="bn5")
-    drpo5 = tf.layers.dropout(bn5, rate=dropoutProb, name="drpo5")
-    # fc-relu-bn-dropout
-    fc6 = tf.matmul(drpo5, fcWeights6) + fcBias6 #A 1000 hidden unit layer, done manually to make regularization more straightforward
-    a6 = tf.nn.relu(fc6, name="a6")
-    bn6 = tf.layers.batch_normalization(a6, training=trainingMode, name="bn6")
-    drpo6 = tf.layers.dropout(bn6, rate=dropoutProb, name="drpo6")
+    fc = tf.matmul(bn7Flat, fcWeights) + fcBias #A 1000 hidden unit layer, done manually to make regularization more straightforward
+    fca = tf.nn.relu(fc, name="fca")
+    fcbn = tf.layers.batch_normalization(fca, training=trainingMode, name="fcbn")
+    fcdrpo = tf.layers.dropout(fcbn, rate=dropoutProb, name="fcdrpo")
     # fc output
-    fc7 = tf.layers.dense(drpo6, 10, name="fc7")
+    fcout = tf.layers.dense(fcdrpo, 10, name="fc7")
     
     #regularization
-    convRegularizer = betaConv*(tf.nn.l2_loss(filter1, name="filter1Reg") + tf.nn.l2_loss(filter2, name="filter2Reg") + tf.nn.l2_loss(filter3, name="filter3Reg") + tf.nn.l2_loss(filter4, name="filter4Reg"))
-    fcRegularizer =  betaFC*(tf.nn.l2_loss(fcWeights5, name="fcWeights5Reg") + tf.nn.l2_loss(fcWeights6, name="fcWeights6Reg"))
-    l2Regularizer = convRegularizer + fcRegularizer
-    return fc7, l2Regularizer
+    #convRegularizer = betaConv*(tf.nn.l2_loss(filter1, name="filter1Reg") + tf.nn.l2_loss(filter2, name="filter2Reg") + tf.nn.l2_loss(filter3, name="filter3Reg") + tf.nn.l2_loss(filter4, name="filter4Reg"))
+    #fcRegularizer =  betaFC*(tf.nn.l2_loss(fcWeights, name="fcWeights5Reg") + tf.nn.l2_loss(fcWeights6, name="fcWeights6Reg"))
+    #l2Regularizer = convRegularizer + fcRegularizer
+    l2Regularizer = 0
+    return fcout, l2Regularizer
 
 outputLayer, regularizer  = makeTwoConvLayersGraph(x)
 loss = tf.losses.softmax_cross_entropy(tf.one_hot(y, 10), outputLayer) + regularizer
@@ -161,13 +160,13 @@ def runNN(session, xIn, yIn, trainer=None, epochs=1, batchSize=100, printEvery =
     batchIndices = np.arange(numExamples)
     for epoch in range(epochs):
         #data augmentation
-        xAugmented = np.zeros([numExamples, 28, 28, 3]) #The 28s are yet another place that the amount of cropping is hardcoded.
+        xAugmented = np.zeros([numExamples, 32, 32, 3]) #The first two numbers are yet another place that the amount of cropping is hardcoded.
         if trainer is not None:
             for i in range(numExamples):
-                xAugmented[i, :, :, :] = RandomHueShift(RandomHorizontalFlip(RandomCropper(xIn[i, :, :, :], cropPixels=4)))
+                xAugmented[i, :, :, :] = RandomHueShift(RandomHorizontalFlip(RandomCropper(xIn[i, :, :, :], cropPixels=0)))
         else:
             for i in range(numExamples):
-                xAugmented[i, :, :, :] = RandomCropper(xIn[i, :, :, :], cropPixels=4) #stochasticity during test time??????? this seems bad but idk how else to make the images fit
+                xAugmented[i, :, :, :] = RandomCropper(xIn[i, :, :, :], cropPixels=0) #stochasticity during test time??????? this seems bad but idk how else to make the images fit
         np.random.shuffle(batchIndices)
         batchLossAggregator = 0
         correctAggregator = 0
@@ -206,10 +205,10 @@ def runNN(session, xIn, yIn, trainer=None, epochs=1, batchSize=100, printEvery =
 
 #### Execution #####
 with tf.Session() as sess:
-    with tf.device("/gpu:0"):
+    with tf.device("/cpu:0"):
         sess.run(tf.global_variables_initializer())
         print('Training')
-        runNN(sess, inputData, outputLabels, trainer=trainer, epochs=151, printEvery=10, lossPlot=False)
+        runNN(sess, inputData, outputLabels, trainer=trainer, epochs=11, printEvery=5, lossPlot=False)
         print('Validation')
         runNN(sess, validationInputData, validationOutputLabels, trainer=None, batchSize=1000, lossPlot=False)
 
